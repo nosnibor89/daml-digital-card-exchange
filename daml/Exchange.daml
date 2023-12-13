@@ -1,0 +1,147 @@
+module Exchange where
+
+import DA.List
+
+-- Types
+type CardBidId = ContractId CardBid
+type CardId = ContractId Card
+type BiddingServiceId = ContractId BiddingService
+-- Script/Record
+cardNotFound: Text -> Text
+cardNotFound cardId = "Card Not Found. ID" <> cardId
+
+data CardInfo = CardInfo with
+    description: Text
+    cardUrl: Text
+    id: Text
+        deriving (Eq, Show)
+
+-- Templates
+template CardBid
+    with
+        bidder: Party
+        issuer: Party
+        bid: Numeric 2
+        card: Card
+    where
+        signatory bidder
+        observer card.owner
+        key (bidder, card.cardInfo.id): (Party, Text)
+        maintainer key._1
+        ensure (bid >= card.price)
+
+template BiddingService
+    with
+        bidder: Party
+        card: Card
+    where
+        signatory bidder
+        nonconsuming choice AddBid : CardBidId
+            with
+                bidder: Party
+                bid: Numeric 2
+            controller bidder
+            do
+               -- Check bid is higher than current bid
+                assertMsg "[Bid Failed] - Low bid" (bid >= card.price)
+                -- Check bidder is not the owner
+                assertMsg "[Bid Failed] - You are the owner" (bidder /= card.owner)
+                -- Create bid
+                assertMsg "[Bid Failed] - Card is not set for bidding yet" (card.isBidding)
+                
+                lookupByKey @CardBid (bidder, card.cardInfo.id) >>= \case
+                    None -> do
+                        debug $ "bid created by " <> show bidder <> "on card " <> show card.cardInfo.id
+                        create CardBid with
+                                    bidder = bidder
+                                    card = card
+                                    bid = bid
+                                    issuer = card.issuer
+                    Some _ -> trace "Bid Already Exist" error "Bid already exists"
+                
+
+
+template CardService
+    with
+        cardIssuer: Party
+    where 
+        signatory cardIssuer
+        
+        nonconsuming choice PublishCard : CardId
+            with
+                description: Text
+                cardUrl: Text
+                price: Numeric 2
+                id: Text
+            controller cardIssuer
+            do
+                let info = CardInfo with
+                        description = description
+                        cardUrl = cardUrl
+                        id = id
+
+                -- Check card already exists 
+                lookupByKey @Card (cardIssuer, id) >>= \case
+                    None -> do
+                        -- Create card
+                        create Card with
+                            issuer = cardIssuer
+                            owner = cardIssuer
+                            isBidding = False
+                            previusOwner = None
+                            price = price
+                            cardInfo = info
+                    Some _ -> trace "Card Already Exist" error "Card already exists"
+
+        nonconsuming choice FetchCard: (CardId, Card)
+            with 
+                cardId: Text
+            controller cardIssuer
+            do 
+                fetchByKey @Card (cardIssuer, cardId)
+
+template Card
+    with
+        issuer: Party
+        owner: Party
+        isBidding: Bool
+        previusOwner: Optional Party
+        price: Numeric 2
+        cardInfo: CardInfo
+
+    where 
+        signatory issuer
+        observer owner
+        key (issuer, cardInfo.id): (Party, Text)
+        maintainer key._1
+        ensure (
+                -- Price must be positive
+                 price >= 0.0 && 
+                 -- id must not be empty
+                 cardInfo.id /= ""
+            )
+
+        choice StartBidding: CardId
+            with 
+                newPrice: Numeric 2
+            controller owner
+                do
+                    create this with
+                        price = newPrice
+                        isBidding = True
+        
+        choice AcceptHighestBid: CardId
+            with
+                bids: [(CardBidId, CardBid)]
+            controller owner
+            do
+            if null bids then 
+                trace "No Bids" error "No Bids"
+            else do
+                let contracts = map snd bids
+                    highestBid = maximumBy (\a b -> compare a.bid b.bid) contracts
+                -- Transfer card to highest bidder
+                create this with
+                    owner = highestBid.bidder
+                    previusOwner = Some owner
+                    isBidding = False

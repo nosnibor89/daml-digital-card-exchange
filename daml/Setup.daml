@@ -1,0 +1,42 @@
+module Setup where
+
+import Daml.Script
+import DA.Foldable
+import Exchange 
+
+data TestBidderInfo = TestBidderInfo with
+    biddingService: BiddingServiceId
+    bid: CardBidId
+    bidder: Party
+        deriving (Eq, Show)
+
+createCardBiddingService: Party -> Card -> Script(ContractId BiddingService)
+createCardBiddingService bidder card = do submit bidder 
+                                    do createCmd BiddingService 
+                                        with { bidder = bidder, card = card }
+
+bidOnCard : Party -> Card -> Numeric 2 -> Script TestBidderInfo
+bidOnCard bidder card bid = script do
+    biddingServiceCid <- createCardBiddingService bidder card
+    bidCid1 <- submit bidder do
+        exerciseCmd biddingServiceCid AddBid with
+            bidder = bidder
+            bid = bid
+
+    return TestBidderInfo with
+        biddingService = biddingServiceCid
+        bid = bidCid1
+        bidder = bidder
+
+closeTestBids: [(CardBidId, CardBid)] -> [(BiddingServiceId, Party)]-> Script()
+closeTestBids bids biddingServices = script do 
+    forA_ bids (\(cid, contract) -> submit contract.bidder do 
+            archiveCmd cid
+            )
+
+    forA_ biddingServices (\(cid, bidder) -> submit bidder 
+            do archiveCmd cid
+        )
+
+createCardService: Party -> Script(ContractId CardService)
+createCardService issuer = do submit issuer do createCmd CardService { cardIssuer = issuer }

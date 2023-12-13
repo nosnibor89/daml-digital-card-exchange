@@ -1,0 +1,141 @@
+module TestExchange where
+
+import Daml.Script
+import Exchange
+import Setup
+
+
+{-
+   Test main workflow and happy paths
+   1. Issuer company can publish card and sets open for bidding
+   2. Buyer 1 bids on card
+   3. Buyer 2 bids on card
+   4. Issuer company (also current card owner) can accept highest bid and transfer ownership to highest buyer
+   5. New owner(former Buyer 2) sets new price for card
+   6. Buyer 3 bids on card
+   7. Buyer 1 bids on card
+   8. New owner(former Buyer 2) can accept highest bid and transfer ownership to highest buyer
+-}
+testBiddingWorkflow: Script()
+testBiddingWorkflow = script do
+    nba <- allocateParty "NBA"
+    cardService <- createCardService nba
+    buyer1 <- allocateParty "buyer1"
+    buyer2 <- allocateParty "buyer2"
+    buyer3 <- allocateParty "buyer3"
+
+    --  NBA Issues a card and sets it for bidding
+    cardCid <- submit nba do
+        exerciseCmd cardService PublishCard with
+            description = "Michael Jordan rookie card"
+            price = 1.00
+            cardUrl = "http://fakeurl.com"
+            id = "michael-jordan-rookie-card"
+
+    -- First Bidding Starts
+    cardCid <- submit nba do 
+        exerciseCmd cardCid StartBidding with
+            newPrice = 2000.00
+
+    (cardCid, card) <- submit nba do
+        exerciseCmd cardService FetchCard with
+            cardId = "michael-jordan-rookie-card"
+    
+    -- buyer1 bids 3000
+    bid1Info <- bidOnCard buyer1 card 3000.00
+
+    -- buyer2 bids 2500
+    bid2Info <- bidOnCard buyer2 card 2500.00
+    
+    -- NBA accepts highest bid
+    bids <- query @CardBid nba
+
+    submit nba do
+        exerciseCmd cardCid AcceptHighestBid with
+            bids = bids
+    closeTestBids bids [(bid1Info.biddingService, bid1Info.bidder), (bid2Info.biddingService, bid2Info.bidder)]
+
+
+    -- Second Bidding Starts
+    
+    -- (cardCid, card) <- submit nba do
+    --     exerciseCmd cardService FetchCard with
+    --         cardId = "michael-jordan-rookie-card"
+
+    -- -- buyer 1 is new card owner, so he can start the bidding
+    -- cardCid <- submit buyer1 do 
+    --     exerciseCmd cardCid StartBidding with
+    --         newPrice = 10000.00
+
+    -- buyer3 bids 11000
+
+
+
+-- Unhappy paths
+
+  
+
+
+
+
+
+-- testPublishCard: Card can be created
+testPublishCard: Script ()
+testPublishCard = script do 
+    nba <- allocateParty "NBA"
+    service <- createCardService(nba)
+
+    submit nba do
+        exerciseCmd service PublishCard with
+            description = "Michael Jordan rookie card"
+            price = 1000.00
+            cardUrl = "http://fakeurl.com"
+            id = "michael-jordan-rookie-card"
+
+    debug "asset created"
+
+-- testCantPublishDuplicatedCard: Card cannot be created twice
+testCantPublishDuplicatedCard: Script ()
+testCantPublishDuplicatedCard = script do 
+    nba <- allocateParty "NBA"
+    service <- createCardService(nba)
+
+    submit nba do
+        exerciseCmd service PublishCard with
+            description = "Michael Jordan rookie card"
+            price = 1000.00
+            cardUrl = "http://fakeurl.com"
+            id = "michael-jordan-rookie-card"
+
+    -- Trying to create an asset with the same id should fail
+    submitMustFail nba do
+        exerciseCmd service PublishCard with
+            description = "Michael Jordan rookie card"
+            price = 1000.00
+            cardUrl = "http://fakeurl.com"
+            id = "michael-jordan-rookie-card"
+
+
+
+
+-- -- testCanBidCard: Test buyer/buyer can bid
+-- testCanBidCard: Script ()
+-- testCanBidCard = script do 
+--     nba <- allocateParty "NBA"
+--     service <- createCardService(nba)
+--     buyer <- allocateParty "Buyer 1"
+
+--     mjCard <- submit nba do
+--         exerciseCmd service PublishCard with
+--             description = "Michael Jordan rookie card"
+--             price = 1000.00
+--             assetUrl = "http://fakeurl.com"
+--             id = "michael-jordan-rookie-card"
+
+-- -- Someone bids
+--     submit nba do
+--         exerciseCmd mjCard Bid with
+--             buyer = buyer
+--             amount = 1000.00
+
+--     debug "asset bought"
