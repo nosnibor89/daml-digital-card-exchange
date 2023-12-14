@@ -6,7 +6,7 @@ import Setup
 
 
 {-
-   Test main workflow and happy paths
+   Test main workflow and happy paths tests
    1. Issuer company can publish card and sets open for bidding
    2. Buyer 1 bids on card
    3. Buyer 2 bids on card
@@ -78,7 +78,7 @@ testBiddingWorkflow = script do
     closeTestBids bids [(bid1Info.biddingService, bid1Info.bidder), (bid2Info.biddingService, bid2Info.bidder)]
 
 
--- Unhappy paths
+-- Unhappy paths tests
 
 -- testCantPublishDuplicatedCard: Card cannot be created twice with same id
 testCantPublishDuplicatedCard: Script ()
@@ -188,3 +188,25 @@ testCantBidOnOwnCard = script do
         exerciseCmd biddingService AddBid with
             bid = 2000.00
             bidder = issuer
+
+-- testCantAcceptBidOnEmptyBids: Owner cannot accept bid if there arent any bids
+testCantAcceptBidOnEmptyBids: Script ()
+testCantAcceptBidOnEmptyBids = script do 
+    issuer <- allocateParty "NBA"
+    service <- createCardService(issuer)
+
+    cardCid <- submit issuer do
+        exerciseCmd service PublishCard with
+            description = "Michael Jordan rookie card"
+            price = 1000.00
+            cardUrl = "http://fakeurl.com"
+            id = "michael-jordan-rookie-card"
+
+    cardCid <- submit issuer do 
+        exerciseCmd cardCid StartBidding with
+            newPrice = 2000.00
+
+    -- issuer (Issuer) accepts highest bid. Should fail as there arent any bids yet
+    submitMustFail issuer do
+        exerciseCmd cardCid AcceptHighestBid with
+            bids = []
