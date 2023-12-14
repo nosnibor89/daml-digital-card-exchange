@@ -30,7 +30,7 @@ However, here are some business challenges I found while build the app that coul
 
 ## IV. Compiling & Testing
 
-To compile and test, run the pre-written script in the `Test.daml` under /daml OR run:
+To compile, run and/or test you can execute the following:
 
 Run and start Navigator
 
