@@ -6,10 +6,8 @@ import DA.List
 type CardBidId = ContractId CardBid
 type CardId = ContractId Card
 type BiddingServiceId = ContractId BiddingService
--- Script/Record
-cardNotFound: Text -> Text
-cardNotFound cardId = "Card Not Found. ID" <> cardId
 
+-- Record
 data CardInfo = CardInfo with
     description: Text
     cardUrl: Text

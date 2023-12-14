@@ -4,7 +4,7 @@
 sdk-version: 2.7.5
 name: digital-card-exchange
 source: daml
-init-script: Setup:setup
+init-script: Setup:setupTestUsersAndParties
 version: 0.0.1
 dependencies:
   - daml-prim

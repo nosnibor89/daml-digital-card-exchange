@@ -10,6 +10,13 @@ data TestBidderInfo = TestBidderInfo with
     bidder: Party
         deriving (Eq, Show)
 
+data TestParties = TestParties with 
+    issuer: Party
+    buyer1: Party
+    buyer2: Party
+    buyer3: Party 
+        deriving (Eq, Show)
+
 createCardBiddingService: Party -> Card -> Script(ContractId BiddingService)
 createCardBiddingService bidder card = do submit bidder 
                                     do createCmd BiddingService 
@@ -40,3 +47,29 @@ closeTestBids bids biddingServices = script do
 
 createCardService: Party -> Script(ContractId CardService)
 createCardService issuer = do submit issuer do createCmd CardService { cardIssuer = issuer }
+
+setupTestUsersAndParties: Script TestParties
+setupTestUsersAndParties = script do
+    -- 1. Allocate parties with the given display name
+    issuer <- allocatePartyWithHint "Issuer" (PartyIdHint "ISSR")
+    buyer1 <- allocatePartyWithHint "Buyer1" (PartyIdHint "BYR1")
+    buyer2 <- allocatePartyWithHint "Buyer2" (PartyIdHint "BYR2")
+    buyer3 <- allocatePartyWithHint "Buyer3" (PartyIdHint "BYR3")
+
+    -- 2. Construct user-ids from text
+    issuerId <- validateUserId "NBA-ISSR"   
+    aliceId <- validateUserId "Alice-BYR1"
+    bobId <- validateUserId "Bob-BYR2"
+    mattId <- validateUserId "Matt-BYR3"
+
+    -- 3. Create users with the given rights 
+    createUser (User issuerId (Some issuer)) [CanActAs issuer]  
+    createUser (User aliceId (Some buyer1)) [CanActAs buyer1]
+    createUser (User bobId (Some buyer2)) [CanActAs buyer2]
+    createUser (User mattId (Some buyer3)) [CanActAs buyer3]
+
+    return TestParties with
+        issuer = issuer
+        buyer1 = buyer1
+        buyer2 = buyer2
+        buyer3 = buyer3
