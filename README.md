@@ -1,6 +1,6 @@
 # 🖼️ DigitalCardExchange 🖼️
 
-DigitalCardExchange digital card exchange Daml app.
+Digital card exchange Daml app.
 
 ## I. Overview
 
